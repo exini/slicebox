@@ -105,7 +105,7 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.11",
     "org.webjars" % "angular-material" % "1.1.5",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "com.exini" %% "dicom-streams" % "0.8",
+    "com.exini" %% "dicom-streams" % "0.10",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion
