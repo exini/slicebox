@@ -6,7 +6,7 @@ Service | Status | Description
 Bintray           | [![Download](https://api.bintray.com/packages/exini/slicebox/installers/images/download.svg) ](https://bintray.com/exini/slicebox/installers/_latestVersion) | Latest Version on Bintray
 Travis            | [![Build Status](https://travis-ci.org/exini/slicebox.svg?branch=develop)](https://travis-ci.org/exini/slicebox.svg?branch=develop) | [Tests](https://travis-ci.org/exini/slicebox/)
 Coveralls         | [![Coverage Status](https://coveralls.io/repos/github/exini/slicebox/badge.svg?branch=develop)](https://coveralls.io/github/exini/slicebox?branch=develop) | Code coverage
-Gitter            | [![Join the chat at https://gitter.im/exini/slicebox](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/exini/slicebox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) | Chatroom
+Gitter            | [![Join the chat at https://gitter.im/exini-slicebox](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/exini-slicebox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) | Chatroom
 Documentation     | - | [Wiki](https://github.com/exini/slicebox/wiki)
 API Documentation | - | [REST API](http://exini.github.io/slicebox-api)
 
