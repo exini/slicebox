@@ -3,12 +3,12 @@
 
 Service | Status | Description
 ------- | ------ | -----------
-Bintray           | [![Download](https://api.bintray.com/packages/slicebox/slicebox/installers/images/download.svg) ](https://bintray.com/slicebox/slicebox/installers/_latestVersion) | Latest Version on Bintray
-Travis            | [![Build Status](https://travis-ci.org/slicebox/slicebox.svg?branch=develop)](https://travis-ci.org/slicebox/slicebox.svg?branch=develop) | [Tests](https://travis-ci.org/slicebox/slicebox/)
-Coveralls         | [![Coverage Status](https://coveralls.io/repos/github/slicebox/slicebox/badge.svg?branch=develop)](https://coveralls.io/github/slicebox/slicebox?branch=develop) | Code coverage
-Gitter            | [![Join the chat at https://gitter.im/slicebox/slicebox](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/slicebox/slicebox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) | Chatroom
-Documentation     | - | [Wiki](https://github.com/slicebox/slicebox/wiki)
-API Documentation | - | [REST API](http://slicebox.github.io/slicebox-api)
+Bintray           | [![Download](https://api.bintray.com/packages/exini/slicebox/installers/images/download.svg) ](https://bintray.com/exini/slicebox/installers/_latestVersion) | Latest Version on Bintray
+Travis            | [![Build Status](https://travis-ci.org/exini/slicebox.svg?branch=develop)](https://travis-ci.org/exini/slicebox.svg?branch=develop) | [Tests](https://travis-ci.org/exini/slicebox/)
+Coveralls         | [![Coverage Status](https://coveralls.io/repos/github/exini/slicebox/badge.svg?branch=develop)](https://coveralls.io/github/exini/slicebox?branch=develop) | Code coverage
+Gitter            | [![Join the chat at https://gitter.im/exini/slicebox](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/exini/slicebox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) | Chatroom
+Documentation     | - | [Wiki](https://github.com/exini/slicebox/wiki)
+API Documentation | - | [REST API](http://exini.github.io/slicebox-api)
 
 Slicebox is a microservice for safe sharing and easy access to medical images. The goal of the project is to facilitate research and collaboration between hospitals and universities. The service makes it easy to send images from the hosptial's PACS (image archive) to collaborators on the outside. Anonymization is handled automatically, relieving the hospital staff of the burden of making sure patient information does not leave the hospital network.
 
@@ -36,12 +36,12 @@ Slicebox provides a rich set of features for importing, exporting, managing and 
 User Manual
 -----------
 
-The user manual with information on installing, configuring and using slicebox is available as a project wiki at [github.com/slicebox/slicebox/wiki](https://github.com/slicebox/slicebox/wiki).
+The user manual with information on installing, configuring and using slicebox is available as a project wiki at [github.com/exini/slicebox/wiki](https://github.com/exini/slicebox/wiki).
 
 API
 ---
 
-A full specification of the Slicebox API is available at [slicebox.github.io/slicebox-api](http://slicebox.github.io/slicebox-api).
+A full specification of the Slicebox API is available at [exini.github.io/slicebox-api](http://exini.github.io/slicebox-api).
 
 Versioning
 ----------
