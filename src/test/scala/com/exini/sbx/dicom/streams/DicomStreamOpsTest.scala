@@ -225,7 +225,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     val elements = TestUtil.testImageDicomData()
     val bytesSource = StreamSource.single(TestUtil.toBytes(elements))
     dicomStreamOpsImpl.storeDicomData(bytesSource, source).map { metaDataAdded =>
-      storage.storage.get(storage.imageName(metaDataAdded.image.id)) shouldBe defined
+      Option(storage.storage.get(storage.imageName(metaDataAdded.image.id))) shouldBe defined
       metaDataAdded.patient.patientName.value shouldBe elements.getString(Tag.PatientName).get
       metaDataAdded.patient.patientID.value shouldBe elements.getString(Tag.PatientID).get
       metaDataAdded.study.studyInstanceUID.value shouldBe elements.getString(Tag.StudyInstanceUID).get
@@ -274,8 +274,8 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
       metaDataAdded1 <- dicomStreamOpsImpl.storeDicomData(bytesSource, source)
       (_, metaDataAdded2) <- dicomStreamOpsImpl.modifyData(metaDataAdded1.image.id, Seq.empty)
     } yield {
-      storage.storage.get(storage.imageName(metaDataAdded1.image.id)) should not be defined
-      storage.storage.get(storage.imageName(metaDataAdded2.image.id)) shouldBe defined
+      Option(storage.storage.get(storage.imageName(metaDataAdded1.image.id))) should not be defined
+      Option(storage.storage.get(storage.imageName(metaDataAdded2.image.id))) shouldBe defined
     }
   }
 

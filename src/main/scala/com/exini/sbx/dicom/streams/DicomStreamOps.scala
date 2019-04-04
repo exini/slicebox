@@ -94,16 +94,17 @@ trait DicomStreamOps {
     */
   protected def storeDicomData(bytesSource: StreamSource[ByteString, _], source: Source, storage: StorageService, contexts: Seq[Context], reverseAnonymization: Boolean)
                               (implicit materializer: Materializer, ec: ExecutionContext): Future[MetaDataAdded] = {
-    val tempPath = createTempPath()
     callFilteringService[Seq[TagFilterSpec]](GetFilterSpecsForSource(source.toSourceRef))
       .flatMap { filters =>
-        val filterFlow = tagFilterSpecsToFlow(filters)
+        val tempPath = createTempPath()
 
-        val flow = storage.parseFlow(None)
+        def filterFlow: Option[PartFlow] = tagFilterSpecsToFlow(filters)
+
+        def flow = storage.parseFlow(None)
           .via(validationFlow(contexts))
           .via(processIncomingFlow(filterFlow, reverseAnonymization, anonymizationKeyQuery))
 
-        val sink = dicomDataSink(storage.fileSink(tempPath))
+        def sink = dicomDataSink(storage.fileSink(tempPath))
 
         bytesSource.via(flow).runWith(sink)
           .flatMap(elements => storeDicomData(elements, source, tempPath, storage))
@@ -394,16 +395,34 @@ trait DicomStreamOps {
     if (tagFilterFlow.isDefined || reverseAnonymization) {
       val label = "collect-reverse"
 
-      groupLengthDiscardFilter
-        .via(toIndeterminateLengthSequences)
-        .via(tagFilterFlow.getOrElse(identityFlow))
+      def filterFlow =
+        if (tagFilterFlow.isDefined) // filtering will happen, must assure no explicit length element groups
+          groupLengthDiscardFilter
+            .via(toIndeterminateLengthSequences)
+            .via(tagFilterFlow.getOrElse(identityFlow))
+        else // no filtering, just keep going
+          identityFlow
+
+      filterFlow
         .via {
           if (reverseAnonymization)
             collectFlow((anonKeysTags ++ anonymizationTags).map(TagPath.fromTag), label)
-              .via(detourFlow({ case p: ElementsPart if p.label == label => isAnonymous(p.elements) },
-                toUtf8Flow
-                  .via(anonymizationKeyQueryFlow(anonymizationKeyQuery, label))
-                  .via(reverseAnonFlow)))
+              .via(detourFlow(
+                {
+                  case p: ElementsPart if p.label == label => isAnonymous(p.elements)
+                }, {
+                  val preFlow = // check if flow is already without explicit length element groups
+                    if (tagFilterFlow.isDefined) // already taken care of above
+                      identityFlow
+                    else // changes will occur, assure no explicit length element groups
+                      groupLengthDiscardFilter.via(toIndeterminateLengthSequences)
+
+                  preFlow
+                    .via(toUtf8Flow)
+                    .via(anonymizationKeyQueryFlow(anonymizationKeyQuery, label))
+                    .via(reverseAnonFlow)
+                }
+              ))
           else
             identityFlow
         }

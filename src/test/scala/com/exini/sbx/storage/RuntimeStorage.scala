@@ -1,5 +1,7 @@
 package com.exini.sbx.storage
 
+import java.util.concurrent.ConcurrentHashMap
+
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
@@ -9,18 +11,16 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class RuntimeStorage extends StorageService {
 
-  import scala.collection.mutable
-
-  val storage = mutable.Map.empty[String, ByteString]
+  val storage = new ConcurrentHashMap[String, ByteString]()
 
   override def deleteByName(names: Seq[String]): Unit = names.foreach(name => storage.remove(name))
 
-  def clear() = storage.clear()
+  def clear(): Unit = storage.clear()
 
-  override def move(sourceImageName: String, targetImageName: String) =
-    storage.get(sourceImageName).map { sourceBytes =>
+  override def move(sourceImageName: String, targetImageName: String): Unit =
+    Option(storage.get(sourceImageName)).map { sourceBytes =>
       storage.remove(sourceImageName)
-      storage(targetImageName) = sourceBytes
+      storage.put(targetImageName, sourceBytes)
       Unit
     }.getOrElse {
       throw new RuntimeException(s"Dicom data not found for key $sourceImageName")
@@ -31,12 +31,12 @@ class RuntimeStorage extends StorageService {
       .mapMaterializedValue {
         _.map {
           bytes =>
-            storage(name) = bytes
+            storage.put(name, bytes)
             Done
         }
       }
 
   override def fileSource(name: String): Source[ByteString, NotUsed] =
-    Source.single(storage.getOrElse(name, throw new NotFoundException(s"No data for name $name")))
+    Source.single(Option(storage.get(name)).getOrElse(throw new NotFoundException(s"No data for name $name")))
 
 }
