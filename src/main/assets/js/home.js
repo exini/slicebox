@@ -994,22 +994,41 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function modifyImages(images, tagMappings) {
-        var modifyPromises = images.map(function (image) {
-            return $http.put('/api/images/' + image.id + '/modify', tagMappings);
-        });
+        var nConcurrent = Math.min(10, images.length);
+        var nModifies = 0;
 
-        return $q.all(modifyPromises).then(function () {
-            sbxToast.showInfoMessage("Images modified");
-        }, function(error) {
-            sbxToast.showErrorMessage('Failed to modify images: ' + error);
-        }).finally(function() {
-            $scope.patientSelected(null);
-            $scope.callbacks.patientsTable.reset();
-            if ($scope.callbacks.flatSeriesTable) {
-                $scope.callbacks.flatSeriesTable.reset();
+        var prepareNext = function() {
+            if (images.length) {
+                next(images.shift());
+            } else if (nModifies <= 0) {
+                sbxToast.showInfoMessage("Images modified");
+                $scope.patientSelected(null);
+                $scope.callbacks.patientsTable.reset();
+                if ($scope.callbacks.flatSeriesTable) {
+                    $scope.callbacks.flatSeriesTable.reset();
+                }
+                updateSeriesTagsPromise();
             }
-            updateSeriesTagsPromise();
-        });
+        };
+
+        var next = function(image) {
+            nModifies += 1;
+            $http.put('/api/images/' + image.id + '/modify', tagMappings).then(
+                function () {
+                    nModifies -= 1;
+                    prepareNext();
+                },
+                function (error) {
+                    sbxToast.showErrorMessage('Failed to modify image ' + image.id + ': ' + error);
+                    nModifies -= 1;
+                    prepareNext();
+                });
+        };
+
+        // start nConcurrent modify:s
+        for (var i = 0; i < nConcurrent; i++) {
+            next(images.shift());
+        }
     }
 
     function confirmModifyPatients(patients) {

@@ -118,7 +118,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .setString(Tag.TargetUID, "1.2.3.4.5.6.7.8.9")
 
     def source() = toAnonSource(elements)
-      .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.TargetUID))
+      .via(DicomFlows.tagFilter(tagPath => tagPath.tag == Tag.TargetUID, _ => false))
       .via(ElementFlows.elementFlow)
 
     val f1 = source().runWith(Sink.head)
@@ -197,7 +197,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val elements = Elements.empty()
       .setString(Tag.PatientID, "12345678")
       .setString(Tag.PatientIdentityRemoved, "YES")
-    val source = toMaybeAnonSource(elements).via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
+    val source = toMaybeAnonSource(elements).via(DicomFlows.tagFilter(tagPath => tagPath.tag == Tag.PatientID, _ => false))
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeader(Tag.PatientID)

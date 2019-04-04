@@ -36,7 +36,7 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
     val bytes = TestUtil.toBytes(elements)
     Source.single(bytes)
       .via(storage.parseFlow(None))
-      .via(DicomFlows.tagFilter(_ => false)(tagPath => !isFileMetaInformation(tagPath.tag)))
+      .via(DicomFlows.tagFilter(tagPath => !isFileMetaInformation(tagPath.tag), _ => false))
   }
 
   def anonKeyPart(key: AnonymizationKey) = AnonymizationKeyOpResultPart(AnonymizationKeyOpResult(DicomHierarchyLevel.IMAGE, Some(key), Seq(

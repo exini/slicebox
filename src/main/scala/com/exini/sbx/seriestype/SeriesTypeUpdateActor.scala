@@ -123,7 +123,7 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
               val tags = getInvolvedTags(seriesTypesInfo)
 
               val futureAttributes = storage.dataSource(image.id, Some(tags.max + 1))
-                .via(tagFilter(_ => false)(tagPath => tags.contains(tagPath.tag)))
+                .via(tagFilter(tagPath => tags.contains(tagPath.tag), _ => false))
                 .via(elementFlow)
                 .runWith(elementSink)
 

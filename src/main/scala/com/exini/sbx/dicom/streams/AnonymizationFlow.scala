@@ -32,7 +32,7 @@ class AnonymizationFlow(profile: AnonymizationProfile) {
   import AnonymizationOp._
 
   def anonFlow: Flow[DicomPart, DicomPart, NotUsed] = {
-    tagFilter(_ => true) { tagPath =>
+    tagFilter(tagPath =>
       !tagPath.toList.map(_.tag).flatMap(profile.opOf)
         .exists {
           case REMOVE => true
@@ -41,8 +41,7 @@ class AnonymizationFlow(profile: AnonymizationProfile) {
           case REMOVE_OR_ZERO_OR_DUMMY => true // always remove (limitation)
           case REMOVE_OR_ZERO_OR_REPLACE_UID => true // always remove (limitation)
           case _ => false
-        }
-    }
+        })
       .via(modifyFlow(
         Seq(
           TagModification(tagPath =>

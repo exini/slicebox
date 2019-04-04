@@ -25,18 +25,16 @@ import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Sink, StreamConverters, 
 import akka.stream.{Materializer, SinkShape}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
-import javax.imageio.ImageIO
-import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import com.exini.dicom.data.DicomParts._
 import com.exini.dicom.data.Elements._
 import com.exini.dicom.data.TagPath.TagPathTag
 import com.exini.dicom.data.{PatientName => _, _}
 import com.exini.dicom.streams.CollectFlow._
 import com.exini.dicom.streams.DicomFlows._
-import com.exini.dicom.streams.DicomStreamException
 import com.exini.dicom.streams.ElementFlows._
 import com.exini.dicom.streams.ElementSink.elementSink
 import com.exini.dicom.streams.ModifyFlow._
+import com.exini.dicom.streams.{DicomStreamException, PartFlow}
 import com.exini.sbx.anonymization.AnonymizationProfile
 import com.exini.sbx.anonymization.AnonymizationProtocol._
 import com.exini.sbx.anonymization.AnonymizationUtil.createUid
@@ -51,6 +49,8 @@ import com.exini.sbx.metadata.MetaDataProtocol._
 import com.exini.sbx.storage.StorageProtocol.ImageInformation
 import com.exini.sbx.storage.StorageService
 import com.exini.sbx.util.SbxExtensions._
+import javax.imageio.ImageIO
+import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future}
@@ -99,8 +99,13 @@ trait DicomStreamOps {
       .flatMap { filters =>
         val filterFlow = tagFilterSpecsToFlow(filters)
 
-        val sink = dicomDataSink(storage.fileSink(tempPath), storage.parseFlow(None), anonymizationKeyQuery, contexts, reverseAnonymization, filterFlow)
-        bytesSource.runWith(sink)
+        val flow = storage.parseFlow(None)
+          .via(validationFlow(contexts))
+          .via(processIncomingFlow(filterFlow, reverseAnonymization, anonymizationKeyQuery))
+
+        val sink = dicomDataSink(storage.fileSink(tempPath))
+
+        bytesSource.via(flow).runWith(sink)
           .flatMap(elements => storeDicomData(elements, source, tempPath, storage))
           .recover {
             case t: Throwable =>
@@ -110,6 +115,7 @@ trait DicomStreamOps {
 
               // The actual cause of failure, in the case of DICOM exceptions, may be hidden deep in the stack trace. Find the deepest such element. If not return the top one.
               def linearize(t: Throwable): List[Throwable] = if (t.getCause == null || t == t.getCause) t :: Nil else t :: linearize(t.getCause)
+
               throw linearize(t)
                 .filter(_.isInstanceOf[DicomStreamException])
                 .lastOption
@@ -135,7 +141,7 @@ trait DicomStreamOps {
           seriesSourceMaybe.map { seriesSource =>
             val forcedSource = storage
               .dataSource(imageId, None)
-              .via(blacklistFilter(Set(TagTree.fromTag(Tag.PatientIdentityRemoved), TagTree.fromTag(Tag.DeidentificationMethod))))
+              .via(blacklistFilter(Set(TagTree.fromTag(Tag.PatientIdentityRemoved), TagTree.fromTag(Tag.DeidentificationMethod)), _ => true))
             val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationKeyInsert(imageId), profile, customAnonValues)
             storeDicomData(anonymizedSource, seriesSource.source, storage, Contexts.extendedContexts, reverseAnonymization = false).flatMap { metaDataAdded =>
               callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId))).map { _ =>
@@ -164,7 +170,7 @@ trait DicomStreamOps {
       }.unwrap.map(_.getOrElse((None, Seq.empty)))
 
     val tempPath = createTempPath()
-    val sink = dicomDataSink(storage.fileSink(tempPath), storage.parseFlow(None), anonymizationKeyQuery, Contexts.extendedContexts, reverseAnonymization = false, identityFlow)
+    val sink = dicomDataSink(storage.fileSink(tempPath))
 
     val futureModifiedTempFile =
       storage
@@ -174,7 +180,6 @@ trait DicomStreamOps {
         .via(toUtf8Flow)
         .via(modifyFlow(Seq.empty, tagModifications))
         .via(fmiGroupLengthFlow)
-        .map(_.bytes)
         .runWith(sink)
 
     for {
@@ -229,7 +234,7 @@ trait DicomStreamOps {
   protected def readImageInformation(imageId: Long, storage: StorageService)(implicit materializer: Materializer, ec: ExecutionContext): Future[ImageInformation] =
     storage
       .dataSource(imageId, Some(Tag.LargestImagePixelValue + 1))
-      .via(whitelistFilter(imageInformationTags.map(TagTree.fromTag)))
+      .via(whitelistFilter(imageInformationTags.map(TagTree.fromTag), _ => true))
       .via(elementFlow)
       .runWith(elementSink)
       .map { elements =>
@@ -382,49 +387,48 @@ trait DicomStreamOps {
 
   private[streams] def createTempPath() = s"tmp-${java.util.UUID.randomUUID().toString}"
 
-  private[streams] def dicomDataSink(storageSink: Sink[ByteString, Future[Done]],
-                                     parseFlow: Flow[ByteString, DicomPart, NotUsed],
-                                     anonymizationKeyQuery: ElementsPart => Future[AnonymizationKeyOpResult],
-                                     contexts: Seq[Context] = Seq.empty,
-                                     reverseAnonymization: Boolean = true,
-                                     tagFilterFlow: Flow[DicomPart, DicomPart, NotUsed] = identityFlow)
-                                    (implicit ec: ExecutionContext): Sink[ByteString, Future[Elements]] = {
+  private[streams] def processIncomingFlow(tagFilterFlow: Option[Flow[DicomPart, DicomPart, NotUsed]],
+                                           reverseAnonymization: Boolean,
+                                           anonymizationKeyQuery: ElementsPart => Future[AnonymizationKeyOpResult])
+                                          (implicit ec: ExecutionContext): PartFlow =
+    if (tagFilterFlow.isDefined || reverseAnonymization) {
+      val label = "collect-reverse"
 
-    val validationContexts = Contexts.asNamePairs(contexts).map(ValidationContext.tupled)
+      groupLengthDiscardFilter
+        .via(toIndeterminateLengthSequences)
+        .via(tagFilterFlow.getOrElse(identityFlow))
+        .via {
+          if (reverseAnonymization)
+            collectFlow((anonKeysTags ++ anonymizationTags).map(TagPath.fromTag), label)
+              .via(detourFlow({ case p: ElementsPart if p.label == label => isAnonymous(p.elements) },
+                toUtf8Flow
+                  .via(anonymizationKeyQueryFlow(anonymizationKeyQuery, label))
+                  .via(reverseAnonFlow)))
+          else
+            identityFlow
+        }
+    } else
+      identityFlow
 
+  private[streams] def dicomDataSink(storageSink: Sink[ByteString, Future[Done]])(implicit ec: ExecutionContext): Sink[DicomPart, Future[Elements]] = {
     def runBothKeepRight[A, B]: (Future[A], Future[B]) => Future[B] = (left, right) => left.flatMap(_ => right)
 
     Sink.fromGraph(GraphDSL.create(storageSink, elementSink)(runBothKeepRight) { implicit builder =>
       (storageSink, elementSink) =>
         import GraphDSL.Implicits._
 
-        val label = "collect-reverse"
-
-        val baseFlow = parseFlow
-          .via(validateContextFlow(validationContexts))
-          .via(collectFlow((anonKeysTags ++ anonymizationTags).map(TagPath.fromTag), label))
-          .via(tagFilterFlow)
-
-        val flow = builder.add {
-          if (reverseAnonymization)
-            baseFlow
-              .via(detourFlow({ case p: ElementsPart if p.label == label => isAnonymous(p.elements) },
-                groupLengthDiscardFilter
-                  .via(toIndeterminateLengthSequences)
-                  .via(toUtf8Flow)
-                  .via(anonymizationKeyQueryFlow(anonymizationKeyQuery, label))
-                  .via(reverseAnonFlow)))
-          else
-            baseFlow
-        }
-
         val bcast = builder.add(Broadcast[DicomPart](2))
 
-        flow ~> bcast.in
-        bcast.out(0) ~> deflateDatasetFlow.map(_.bytes) ~> storageSink
-        bcast.out(1) ~> whitelistFilter((encodingTags ++ tagsToStoreInDB).map(TagTree.fromTag)) ~> elementFlow ~> elementSink
+        def whitelistNoWarnings(whitelist: Set[_ <: TagTree]): PartFlow = tagFilter(
+          currentPath => whitelist.exists(t => t.hasTrunk(currentPath) || t.isTrunkOf(currentPath)),
+          _ => false, logGroupLengthWarnings = false)
 
-        SinkShape(flow.in)
+        val elementTags = (encodingTags ++ tagsToStoreInDB).map(TagTree.fromTag)
+
+        bcast.out(0) ~> deflateDatasetFlow.map(_.bytes) ~> storageSink
+        bcast.out(1) ~> whitelistNoWarnings(elementTags) ~> elementFlow ~> elementSink
+
+        SinkShape(bcast.in)
     })
   }
 
@@ -467,12 +471,18 @@ trait DicomStreamOps {
       .map(_.bytes)
   }
 
-  private def tagFilterSpecsToFlow(tagFilterSpecs: Seq[TagFilterSpec]): Flow[DicomPart, DicomPart, NotUsed] = {
+  private def tagFilterSpecsToFlow(tagFilterSpecs: Seq[TagFilterSpec]): Option[PartFlow] = {
     val blacklistTags = tagFilterSpecs.filter(_.tagFilterType == TagFilterType.BLACKLIST).flatMap(_.tagPaths).toSet
     val whitelistTags = tagFilterSpecs.filter(_.tagFilterType == TagFilterType.WHITELIST).flatMap(_.tagPaths).toSet
-    val blackFilter = if (blacklistTags.isEmpty) identityFlow else blacklistFilter(blacklistTags)
-    val whiteFilter = if (whitelistTags.isEmpty) identityFlow else whitelistFilter(whitelistTags)
-    blackFilter.via(whiteFilter)
+    val blackFilter = if (blacklistTags.isEmpty) None else Some(blacklistFilter(blacklistTags, _ => true))
+    val whiteFilter = if (whitelistTags.isEmpty) None else Some(whitelistFilter(whitelistTags, _ => true))
+    (blackFilter, whiteFilter) match {
+      case (Some(bf), Some(wf)) => Some(bf.via(wf))
+      case _ => blackFilter.orElse(whiteFilter)
+    }
   }
+
+  private def validationFlow(contexts: Seq[Context]) =
+    validateContextFlow(Contexts.asNamePairs(contexts).map(ValidationContext.tupled))
 
 }

@@ -89,33 +89,37 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
   def toSource(elements: Elements): StreamSource[ByteString, NotUsed] = StreamSource.single(elements.toBytes())
 
   "Validating a DICOM file" should "throw an exception for a non-supported context" in {
+    val source = Source(SourceType.USER, "Jane", -1)
     val bytes = preamble ++ fmiGroupLength(unsupportedMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ unsupportedMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
-    val source = StreamSource.single(bytes)
+    val bytesSource = StreamSource.single(bytes)
     recoverToSucceededIf[DicomStreamException] {
-      source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyOpResult.empty), Contexts.imageDataContexts))
+      dicomStreamOpsImpl.storeDicomData(bytesSource, source)
     }
   }
 
   it should "pass a supported context" in {
+    val source = Source(SourceType.USER, "Jane", -1)
     val bytes = preamble ++ fmiGroupLength(supportedMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ supportedMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
-    val source = StreamSource.single(bytes)
-    source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyOpResult.empty), Contexts.imageDataContexts))
+    val bytesSource = StreamSource.single(bytes)
+    dicomStreamOpsImpl.storeDicomData(bytesSource, source)
       .map(_ => succeed)
   }
 
   it should "throw an exception for a context with an unknown SOP Class UID" in {
+    val source = Source(SourceType.USER, "Jane", -1)
     val bytes = preamble ++ fmiGroupLength(unknownMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ unknownMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
-    val source = StreamSource.single(bytes)
+    val bytesSource = StreamSource.single(bytes)
     recoverToSucceededIf[DicomStreamException] {
-      source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyOpResult.empty), Contexts.imageDataContexts))
+      dicomStreamOpsImpl.storeDicomData(bytesSource, source)
     }
   }
 
   it should "not accept DICOM data with missing file meta information" in {
+    val source = Source(SourceType.USER, "Jane", -1)
     val bytes = supportedSOPClassUID
-    val source = StreamSource.single(bytes)
+    val bytesSource = StreamSource.single(bytes)
     recoverToSucceededIf[DicomStreamException] {
-      source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyOpResult.empty), Contexts.imageDataContexts))
+      dicomStreamOpsImpl.storeDicomData(bytesSource, source)
     }
   }
 
@@ -185,7 +189,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
       sopInstanceUIDs.map { sopInstanceUID =>
         val modifiedBytesSource = bytesSource
           .via(storage.parseFlow(None))
-          .via(DicomFlows.blacklistFilter(Set(TagTree.fromTag(Tag.PixelData))))
+          .via(DicomFlows.blacklistFilter(Set(TagTree.fromTag(Tag.PixelData)), _ => true))
           .via(modifyFlow(modifications = Seq(
             TagModification.equals(
               TagPath.fromTag(Tag.MediaStorageSOPInstanceUID),
