@@ -994,14 +994,15 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function modifyImages(images, tagMappings) {
-        var nConcurrent = Math.min(10, images.length);
+        var nImages = images.length;
+        var nConcurrent = Math.min(10, nImages);
         var nModifies = 0;
 
         var prepareNext = function() {
-            if (images.length) {
+            if (images.length > 0) {
                 next(images.shift());
             } else if (nModifies <= 0) {
-                sbxToast.showInfoMessage("Images modified");
+                sbxToast.showInfoMessage(nImages + " images modified");
                 $scope.patientSelected(null);
                 $scope.callbacks.patientsTable.reset();
                 if ($scope.callbacks.flatSeriesTable) {
