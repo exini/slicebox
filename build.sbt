@@ -2,7 +2,7 @@ import CreateSources._
 
 name := "slicebox"
 version := "2.1-SNAPSHOT"
-organization := "se.nimsa"
+organization := "com.exini"
 scalaVersion := "2.12.8"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
@@ -10,10 +10,10 @@ scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked
 
 lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, SystemVPlugin, DockerPlugin, AshScriptPlugin, BuildInfoPlugin)
 
-mainClass in Compile := Some("se.nimsa.sbx.app.Slicebox")
+mainClass in Compile := Some("com.exini.sbx.app.Slicebox")
 
 buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)
-buildInfoPackage := "se.nimsa.sbx.app"
+buildInfoPackage := "com.exini.sbx.app"
 
 // for sbt-resolver, (the re-start and re-stop commands)
 
@@ -21,7 +21,7 @@ Revolver.settings
 
 // native packaging
 
-maintainer := "nimsa.se"
+maintainer := "exini.com"
 packageSummary := "Slicebox DICOM sharing service"
 packageDescription := "Slicebox is a service for sharing medical image data with collaborators while protecting patient information"
 
@@ -57,8 +57,8 @@ rpmRelease := {
 
 // for automatic license stub generation
 
-organizationName := "Lars Edenbrandt"
-startYear := Some(2014)
+organizationName := "EXINI Diagnostics"
+startYear := Some(2019)
 licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt"))
 
 // repos
@@ -105,7 +105,7 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.11",
     "org.webjars" % "angular-material" % "1.1.5",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dicom-streams" % "0.8",
+    "com.exini" %% "dicom-streams" % "0.10",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion

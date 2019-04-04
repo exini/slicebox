@@ -13,7 +13,7 @@
 	<logger name="scala.slick" level="WARN" />
     <logger name="com.mchange" level="WARN" />
 	<logger name="org.dcm4che3" level="WARN" />
-    <logger name="se.nimsa.sbx" level="ERROR" />
+    <logger name="com.exini.sbx" level="ERROR" />
     <!-- <logger name="scala.slick.jdbc.JdbcBackend.statement" level="DEBUG" /> -->
     <logger name="akka.stream.impl.io.FileSubscriber" level="OFF" />
 

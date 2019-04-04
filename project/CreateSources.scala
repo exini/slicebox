@@ -87,7 +87,7 @@ object CreateSources {
   }
 
   def generate(): String =
-    s"""package se.nimsa.sbx.anonymization
+    s"""package com.exini.sbx.anonymization
       |
       |object AnonymizationProfiles {
       |  import ConfidentialityOption._
