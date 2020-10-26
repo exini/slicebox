@@ -4,14 +4,14 @@ import java.util.UUID
 
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
-import org.scalatest.{FlatSpecLike, Matchers}
-import com.exini.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import com.exini.sbx.anonymization.AnonymizationProtocol._
+import com.exini.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import com.exini.sbx.box.BoxProtocol._
 import com.exini.sbx.dicom.DicomHierarchy.Image
 import com.exini.sbx.storage.RuntimeStorage
 import com.exini.sbx.util.FutureUtil.await
 import com.exini.sbx.util.TestUtil
+import org.scalatest.{FlatSpecLike, Matchers}
 
 import scala.concurrent.Future
 
@@ -20,7 +20,8 @@ class BoxRoutesTest extends {
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
-  val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE))
+  val profile: AnonymizationProfile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE))
+  val emptyProfile: AnonymizationProfile = AnonymizationProfile(Seq.empty)
 
   override def afterEach(): Unit =
     await(Future.sequence(Seq(
@@ -30,16 +31,16 @@ class BoxRoutesTest extends {
       boxDao.clear()
     )))
 
-  def addPollBox(name: String): Box =
+  def addPollBox(name: String, profile: AnonymizationProfile = profile): Box =
     PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name, profile)) ~> routes ~> check {
       status should be(Created)
       val response = responseAs[Box]
       response
     }
 
-  def addPushBox(name: String): Unit = addPushBox(name, "http://some.url/api/box/" + UUID.randomUUID())
+  def addPushBox(name: String, profile: AnonymizationProfile = profile): Unit = addPushBox(name, "http://some.url/api/box/" + UUID.randomUUID(), profile)
 
-  def addPushBox(name: String, url: String): Unit =
+  def addPushBox(name: String, url: String, profile: AnonymizationProfile): Unit =
     PostAsAdmin("/api/boxes/connect", RemoteBox(name, url, profile)) ~> routes ~> check {
       status should be(Created)
       val box = responseAs[Box]
@@ -82,8 +83,8 @@ class BoxRoutesTest extends {
 
   it should "return 201 Created when adding two push boxes with the same name and url" in {
     val url = "http://some.url/api/box/" + UUID.randomUUID()
-    addPushBox("mybox", url)
-    addPushBox("mybox", url)
+    addPushBox("mybox", url, profile)
+    addPushBox("mybox", url, profile)
     GetAsUser("/api/boxes") ~> routes ~> check {
       responseAs[List[Box]] should have length 1
     }
@@ -98,8 +99,8 @@ class BoxRoutesTest extends {
 
   it should "return 201 Created when adding two push boxes with different names but the same urls" in {
     val url = "http://some.url/api/box/" + UUID.randomUUID()
-    addPushBox("mybox1", url)
-    addPushBox("mybox2", url)
+    addPushBox("mybox1", url, profile)
+    addPushBox("mybox2", url, profile)
     GetAsUser("/api/boxes") ~> routes ~> check {
       responseAs[List[Box]] should have length 2
     }
@@ -129,6 +130,15 @@ class BoxRoutesTest extends {
     GetAsUser("/api/boxes?startindex=0&count=1") ~> routes ~> check {
       val boxes = responseAs[List[Box]]
       boxes.size should be(1)
+    }
+  }
+
+  it should "allow listing boxes with no anonymization options" in {
+    addPollBox("hosp", emptyProfile)
+    addPushBox("uni", emptyProfile)
+    GetAsUser("/api/boxes") ~> routes ~> check {
+      val boxes = responseAs[List[Box]]
+      boxes.size should be(2)
     }
   }
 

@@ -43,7 +43,8 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
   implicit val defaultProfileColumnType: BaseColumnType[AnonymizationProfile] =
     MappedColumnType.base[AnonymizationProfile, String](
       p => p.options.map(_.name).mkString(","),
-      s => AnonymizationProfile(s.split(",").map(ConfidentialityOption.withName))
+      s =>
+        AnonymizationProfile(s.split(",").filter(_.nonEmpty).map(ConfidentialityOption.withName))
     )
 
   class BoxTable(tag: Tag) extends Table[Box](tag, BoxTable.name) {
